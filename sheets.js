@@ -1,82 +1,122 @@
+const fs = require('fs').promises;
+const path = require('path');
+const process = require('process');
+const {authenticate} = require('@google-cloud/local-auth');
 const {google} = require('googleapis');
-const fs = require('fs');
-const readline = require('readline');
 
-const creds = {
-    client_id: '349157039103-8mk1l8dqr0c63up4f3p09k189820g1qi.apps.googleusercontent.com',
-    client_secret: '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',
-    redirect_uris: '/auth/google/callback'
+// If modifying these scopes, delete token.json.
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+// The file token.json stores the user's access and refresh tokens, and is
+// created automatically when the authorization flow completes for the first
+// time.
+const TOKEN_PATH = path.join(process.cwd(), 'token.json');
+const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+
+/**
+ * Reads previously authorized credentials from the save file.
+ *
+ * @return {Promise<OAuth2Client|null>}
+ */
+async function loadSavedCredentialsIfExist() {
+  try {
+    const content = await fs.readFile(TOKEN_PATH);
+    const credentials = JSON.parse(content);
+    return google.auth.fromJSON(credentials);
+  } catch (err) {
+    return null;
+  }
 }
 
-function appendData(auth) {
-    const sheets = google.sheets({version: 'v4', auth});
-    const spreadsheetId = '1Oy7vwhEUDyVw6ND_nxKJBZ08sJWZA7j6JjKiEokr6uM';
-    const range = 'Sheet1!A1:C1';  // Update the range based on where you want to insert data
-    const valueInputOption = 'RAW';
-    const values = [
-      ['Shivam RAi', '40', 'shivam@gmail.com'],  // Sample data to append
-    ];
-    
-    const request = {
-      spreadsheetId,
-      range,
-      valueInputOption,
-      resource: { values },
-    };
-    
-    sheets.spreadsheets.values.append(request, (err, result) => {
+/**
+ * Serializes credentials to a file comptible with GoogleAUth.fromJSON.
+ *
+ * @param {OAuth2Client} client
+ * @return {Promise<void>}
+ */
+async function saveCredentials(client) {
+  const content = await fs.readFile(CREDENTIALS_PATH);
+  const keys = JSON.parse(content);
+  const key = keys.installed || keys.web;
+  const payload = JSON.stringify({
+    type: 'authorized_user',
+    client_id: key.client_id,
+    client_secret: key.client_secret,
+    refresh_token: client.credentials.refresh_token,
+  });
+  await fs.writeFile(TOKEN_PATH, payload);
+}
+
+/**
+ * Load or request or authorization to call APIs.
+ *
+ */
+async function authorize() {
+  let client = await loadSavedCredentialsIfExist();
+  if (client) {
+    return client;
+  }
+  client = await authenticate({
+    scopes: SCOPES,
+    keyfilePath: CREDENTIALS_PATH,
+  });
+  if (client.credentials) {
+    await saveCredentials(client);
+  }
+  return client;
+}
+
+/**
+ * Prints the names and majors of students in a sample spreadsheet:
+ * @see https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+ * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
+ */
+async function listMajors(auth) {
+  const sheets = google.sheets({version: 'v4', auth});
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: '1Oy7vwhEUDyVw6ND_nxKJBZ08sJWZA7j6JjKiEokr6uM',
+    range: 'A2:A4',
+  });
+  const rows = res.data.values;
+  if (!rows || rows.length === 0) {
+    console.log('No data found.');
+    return;
+  }
+  console.log('Name, Major:');
+  rows.forEach((row) => {
+    // Print columns A and E, which correspond to indices 0 and 4.
+    console.log(`${row[0]}, ${row[4]}`);
+  });
+}
+
+function writeData(auth) {
+  const sheets = google.sheets({ version: 'v4', auth });
+  let values = [
+    ['Chris', 'Male', '1. Freshman', 'FL', 'Art', 'Baseball'],
+    // Potential next row
+  ];
+  const resource = {
+    values,
+  };
+  sheets.spreadsheets.values.append(
+    {
+      spreadsheetId: '1Oy7vwhEUDyVw6ND_nxKJBZ08sJWZA7j6JjKiEokr6uM',
+      range: 'A1',
+      valueInputOption: 'RAW',
+      resource: resource,
+    },
+    (err, result) => {
       if (err) {
+        // Handle error
         console.log(err);
-        return;
+      } else {
+        console.log(
+          '%d cells updated on range: %s',
+          result.data.updates.updatedCells,
+          result.data.updates.updatedRange
+        );
       }
-      console.log('Data appended successfully:', result.data);
-    });
-  }
-  
+    }
+  );
+}
 
-function getAccessToken(oAuth2Client, callback) {
-    const authUrl = oAuth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/spreadsheets']
-    });
-    console.log('Authorize this app by visiting this URL:', authUrl);
-    
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    
-    rl.question('Enter the code from that page here: ', (code) => {
-      rl.close();
-      oAuth2Client.getToken(code, (err, token) => {
-        if (err) return console.error('Error retrieving access token', err);
-        console.log('****token****RL***', token);
-        oAuth2Client.setCredentials(token);
-        fs.writeFileSync('token.json', JSON.stringify(token));
-        callback(oAuth2Client);
-      });
-    });
-  }
-  
-
-function authorize(credentials, callback) {
-    const {client_secret, client_id, redirect_uris} = credentials;
-    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-  
-    // Check if we have previously stored a token
-    fs.readFile('token.json', (err, token) => {
-      if (err || token) return getAccessToken(oAuth2Client, callback);
-      oAuth2Client.setCredentials(JSON.parse(token));
-      callback(oAuth2Client);
-    });
-  }
-
-
-// Load client secrets from a file
-// fs.readFile('credentials.json', (err, content) => {
-//   if (err) return console.log('Error loading client secret file:', err);
-  
-//   // Authorize with credentials
- 
-// });
-authorize(creds, appendData);
+authorize().then(writeData).catch(console.error);

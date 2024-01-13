@@ -6,7 +6,7 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-const client = require('./db')
+// const client = require('./db')
 
 // app.get('/', function (req, res) {
 //   res.send('Hello World')
@@ -88,6 +88,7 @@ app.get('/auth/google/callback',
 
 
 app.get('/profile', (req, res) => {
+    console.log('user', req.user);
     res.render('profile', { user: req.user });
 });
 
