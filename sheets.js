@@ -37,12 +37,14 @@ async function saveCredentials(client) {
   const content = await fs.readFile(CREDENTIALS_PATH);
   const keys = JSON.parse(content);
   const key = keys.installed || keys.web;
+  console.log("****CLIENT*****",client);
   const payload = JSON.stringify({
     type: 'authorized_user',
     client_id: key.client_id,
     client_secret: key.client_secret,
     refresh_token: client.credentials.refresh_token,
   });
+  console.log("****PAYLOAD*****",payload);
   await fs.writeFile(TOKEN_PATH, payload);
 }
 
@@ -51,10 +53,12 @@ async function saveCredentials(client) {
  *
  */
 async function authorize() {
+  //if exist in token.js
   let client = await loadSavedCredentialsIfExist();
   if (client) {
     return client;
   }
+  //from credential.json file
   client = await authenticate({
     scopes: SCOPES,
     keyfilePath: CREDENTIALS_PATH,
@@ -65,30 +69,33 @@ async function authorize() {
   return client;
 }
 
+//list all the sheet data
 /**
  * Prints the names and majors of students in a sample spreadsheet:
  * @see https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
  * @param {google.auth.OAuth2} auth The authenticated Google OAuth client.
  */
-async function listMajors(auth) {
-  const sheets = google.sheets({version: 'v4', auth});
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: '1Oy7vwhEUDyVw6ND_nxKJBZ08sJWZA7j6JjKiEokr6uM',
-    range: 'A2:A4',
-  });
-  const rows = res.data.values;
-  if (!rows || rows.length === 0) {
-    console.log('No data found.');
-    return;
-  }
-  console.log('Name, Major:');
-  rows.forEach((row) => {
-    // Print columns A and E, which correspond to indices 0 and 4.
-    console.log(`${row[0]}, ${row[4]}`);
-  });
-}
+// async function listMajors(auth) {
+//   const sheets = google.sheets({version: 'v4', auth});
+//   const res = await sheets.spreadsheets.values.get({
+//     spreadsheetId: '1Oy7vwhEUDyVw6ND_nxKJBZ08sJWZA7j6JjKiEokr6uM',
+//     range: 'A2:A4',
+//   });
+//   const rows = res.data.values;
+//   if (!rows || rows.length === 0) {
+//     console.log('No data found.');
+//     return;
+//   }
+//   console.log('Name, Major:');
+//   rows.forEach((row) => {
+//     // Print columns A and E, which correspond to indices 0 and 4.
+//     console.log(`${row[0]}, ${row[4]}`);
+//   });
+// }
 
+// Writes data to the Sheet
 function writeData(auth) {
+  // console.log('writhdata auth', auth)
   const sheets = google.sheets({ version: 'v4', auth });
   let values = [
     ['Chris', 'Male', '1. Freshman', 'FL', 'Art', 'Baseball'],
@@ -120,3 +127,7 @@ function writeData(auth) {
 }
 
 authorize().then(writeData).catch(console.error);
+module.exports = {
+  writeData,
+  authorize
+}
