@@ -1,11 +1,15 @@
-const { Client } = require('pg')
-const client = new Client({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'postgres',
-  password: 'mysecretpassword',
-  port: 5432,
-})
+const { Client } = require('pg');
+
+const pgClient = {
+  user: process.env.PG_USER,
+  host: process.env.PG_HOST,
+  database: process.env.PG_DATABASE,
+  password: process.env.PG_PASSWORD,
+  port: process.env.PG_PORT,
+};
+
+const client = new Client(pgClient);
+
 client.connect(function(err) {
   if (err) throw err;
   console.log("Connected!");
@@ -14,11 +18,10 @@ client.connect(function(err) {
 async function getUser(){
   try {
     const data  = await client.query('SELECT  * FROM  student');
-    console.log("data*******",data.rowCount);
     return data.rows;
   } catch (error) {
-    console.error(error.stack);
-        return false;
+      console.log('ERROR INSIDE getUser', error.stack);
+      return false;
   }
 }
 
@@ -31,7 +34,7 @@ async function insertUser(name, age, email){
              VALUES ($1, $2, $3)`, [name, age, email]);
         return true;
     } catch (error) {
-        console.error(error.stack);
+        console.log('ERROR INSIDE insertUser', error.stack);
         return false;
     }
 };
