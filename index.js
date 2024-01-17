@@ -1,18 +1,18 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
-const fetch = require("node-fetch");
 const session = require('express-session');
 const passport = require('passport');
 const path = require('path');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const Bull = require('bull');
 
-const { pushDataToDb } = require('./DB/db');
+const { CREDENTIALS } = require('./utils/constants')
 const { getUser } = require('./DB/db')
 const {
     writeData,
     loadSavedCredentialsIfExist,
-    getRows,
+    getRowsCount,
     getGoogleSheetClient
   } = require('./Auth/sheets');
 
@@ -29,20 +29,33 @@ saveUninitialized: true
 app.use(passport.initialize());
 app.use(passport.session());
 
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+  
+
 
 const sheetsQueue = new Bull("google", {  redis: 'redis://localhost:6379' });
 
   // REGISTER PROCESSER
   sheetsQueue.process(async (payload, done) => {
-    const {user} = payload.data;
-    let client;
-    client = await loadSavedCredentialsIfExist();
-    if(!client){
-      client = await getGoogleSheetClient(CREDENTIALS_PATH);
+    try {
+      const {user} = payload.data;
+      let client;
+      client = await loadSavedCredentialsIfExist();
+      if(!client){
+        client = await getGoogleSheetClient(CREDENTIALS_PATH);
+      }
+      const rows = await getRowsCount(client);
+      await writeData(user, rows+1, client);
+      done();
+    } catch (error) {
+      console.log('Error inside sheetsQueue.process consumer:->', err);
     }
-    const rows = await getRows(client);
-    await writeData(user, rows+1, client);
-    done();
+    
   });
 
 app.get('/', (req, res) => {
@@ -56,13 +69,7 @@ app.get('/auth/google', passport.authenticate('google', {
 }));
 
 // 2nd
-passport.use(new GoogleStrategy({
-  clientID: '349157039103-8mk1l8dqr0c63up4f3p09k189820g1qi.apps.googleusercontent.com',
-  clientSecret: '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',
-  callbackURL: 'http://localhost:3000/auth/google/callback'
-  }, (accessToken, refreshToken, profile, done) => {
-  console.log('***tokens****', accessToken, refreshToken);
-  console.log("profile******", profile);
+passport.use(new GoogleStrategy(CREDENTIALS, (accessToken, refreshToken, profile, done) => {
   profile.accessToken = accessToken;
   return done(null, profile);
   }));
@@ -77,34 +84,19 @@ app.get('/auth/google/callback', passport.authenticate('google', { failureRedire
 
 //4th
 app.get('/profile', (req, res) => {
-console.log('user', req.user);
-console.log('user token',req.session.accessToken);
-res.render('profile', { user: req.user });
+  res.render('profile', { user: req.user });
 });
 
 app.get('/stream', async (req, res) => {
   try {
     const user = await getUser();
-    const accessToken = req.session.accessToken;
-     console.log('usaccessToken**er*****', accessToken);
-     sheetsQueue.add({ user, accessToken }, { removeOnComplete: true, removeOnFail: true },);
+     sheetsQueue.add({ user }, { removeOnComplete: true, removeOnFail: true },);
      res.status(400).json('done');
   } catch (error) {
-    console.log('err*******',error);
     res.send(error);
-
   }
  
 });
-
-passport.serializeUser((user, done) => {
-done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-done(null, user);
-});
-
 
 app.listen(3000, () => {
   console.log('Server started on http://localhost:3000');
