@@ -12,7 +12,7 @@ const client = new Client(pgClient);
 
 client.connect(function(err) {
   if (err) throw err;
-  console.log("Connected!");
+  console.log("Postgres Connected!");
 });
 
 async function getUser(){

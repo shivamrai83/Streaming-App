@@ -3,11 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <title>User Profile</title>
+    <style>
+        .main {
+         
+            flex-direction: row;
+            font-size: 15px;
+            padding: 5px;
+            width: 400px;
+            margin: auto;
+            justify-content: center;
+            align-items: center;
+        }
+ 
+        .main div {
+            margin: 10px 20px;
+            width: 100px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome <%= user.displayName %></h1>
-    <p>Email: <%= user.emails[0].value %></p>
-    <img src="<%= user.photos[0].value %>" alt="<%= user.displayName %>">
-    <a href="/stream">Start Stream</a>
+    <div class="main">
+        <img width="250" src="<%= user.photos[0].value %>" alt="<%= user.displayName %>">
+        <h1>Welcome <%= user.displayName %></h1>
+        <p>Email: <%= user.emails[0].value %></p>
+        <a href="/stream">Start Stream</a>
+    </div>
 </body>
 </html>
