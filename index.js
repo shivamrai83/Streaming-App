@@ -9,19 +9,12 @@ const Bull = require('bull');
 
 const { CREDENTIALS } = require('./utils/constants')
 const { getUser } = require('./DB/db')
-const {
-    writeData,
-    loadSavedCredentialsIfExist,
-    getRowsCount,
-    getGoogleSheetClient
-  } = require('./Auth/sheets');
-
-const CREDENTIALS_PATH = path.join(process.cwd(), 'Credentials/service_credentials.json');
+const { InsertDataToSheets } = require('./Auth/sheets');
 
 app.set('view engine', 'ejs');
 
 app.use(session({
-  secret: 'your_secret_key', // Make sure to keep this secret and secure in production
+  secret: 'stream_app_secret_key', // Make sure to keep this secret and secure in production
 resave: false,
 saveUninitialized: true
 }));
@@ -43,14 +36,8 @@ const sheetsQueue = new Bull("google", {  redis: 'redis://localhost:6379' });
   // REGISTER PROCESSER
   sheetsQueue.process(async (payload, done) => {
     try {
-      const {user} = payload.data;
-      let client;
-      client = await loadSavedCredentialsIfExist();
-      if(!client){
-        client = await getGoogleSheetClient(CREDENTIALS_PATH);
-      }
-      const rows = await getRowsCount(client);
-      await writeData(user, rows+1, client);
+      const { user } = payload.data;
+      await InsertDataToSheets(user);
       done();
     } catch (error) {
       console.log('Error inside sheetsQueue.process consumer:->', err);
@@ -91,7 +78,7 @@ app.get('/stream', async (req, res) => {
   try {
     const user = await getUser();
      sheetsQueue.add({ user }, { removeOnComplete: true, removeOnFail: true },);
-     res.status(400).json('done');
+     res.status(400).json('Successfully Streamed Data Threw Queue');
   } catch (error) {
     res.send(error);
   }

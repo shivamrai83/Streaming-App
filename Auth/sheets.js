@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const {authenticate} = require('@google-cloud/local-auth');
 const {google} = require('googleapis');
 
-const {SCOPES, TOKEN_PATH, CREDENTIALS_PATH} = require('../utils/constants');
+const {SCOPES, TOKEN_PATH, CREDENTIALS_PATH, SERVICE_CREDENTIALS_PATH} = require('../utils/constants');
 
 // Get OAuthClient with refresh token
 async function loadSavedCredentialsIfExist() {
@@ -90,9 +90,16 @@ async function writeData(data, i, auth) {
 
 }
 
+async function InsertDataToSheets(data){
+  let client;
+      client = await loadSavedCredentialsIfExist();
+      if(!client){
+        client = await getGoogleSheetClient(SERVICE_CREDENTIALS_PATH);
+      }
+      const rows = await getRowsCount(client);
+      await writeData(data, rows+1, client);
+}
+
 module.exports = {
-  writeData,
-  loadSavedCredentialsIfExist,
-  getRowsCount,
-  getGoogleSheetClient
+  InsertDataToSheets
 }
