@@ -14,7 +14,7 @@ const CREDENTIALS = {
 };
 
 const SESSION_OPTIONS = {
-  secret: 'stream_app_secret_key', // Make sure to keep this secret and secure in production
+  secret: 'stream_app_secret_key_here', // Make sure to keep this secret and secure in production
   resave: false,
   saveUninitialized: true
 };
